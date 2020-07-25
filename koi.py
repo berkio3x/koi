@@ -1,12 +1,12 @@
 import socket
 port = 9090
-host = ''
+host = '127.0.0.1'
 
 from app import application
 import os
 import sys
 
-def koi(application):
+def koi(application, conn):
 
 	environ = {}
 	headers_set = []
@@ -24,8 +24,7 @@ def koi(application):
 				sys.stdout.write('%s: %s\r\n'% header)
 			sys.stdout.write('\r\n')
 
-		sys.stdout.write(data)
-		sys.stdout.flush()
+		conn.sendall(data.encode('utf8'))
 
 	def start_response(status, response_headers, exec_info=None):
 		if exec_info:
@@ -41,6 +40,8 @@ def koi(application):
 		return write
 
 	result = application(environ, start_response)
+	print(result)
+
 	try:
 		for data in result:
 			if data:
@@ -57,11 +58,12 @@ if __name__ == '__main__':
 	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 		s.bind((host, port))
 		s.listen(1)
+		print(f'starting koi server on {host}:{port}')
 		conn , addr = s.accept()		
 		with conn:
 			print(f"connected by addr {addr}")
-			koi(application)
+			koi(application, conn)
 			while True:
 				data = conn.recv(1024)
-				if not data:break
-				conn.sendall(data)
+				# if not data:break
+				# conn.sendall(data)

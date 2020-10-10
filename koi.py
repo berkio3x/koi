@@ -1,30 +1,12 @@
-import socket
-import array
 import traceback
-import io
-
-port = 9090
-host = "127.0.0.1"
-
-from app import application
 import os
 import sys
 
-try:
-    from http_parser.parser import HttpParser
-except ImportError:
-    from http_parser.pyparser import HttpParser
-
-
-def make_response(server, content_type):
-    response =  f"HTTP/1.1 200 OK\r\n Server: {server}\r\n Content-Type: {content_type}\r\n"
-    response = response.encode('utf8')
-    return response
-
+from utils import make_response
 
 def koi(application, conn, body, request_method, path_info=None, query_string=None,
          content_type='Application/json', content_length=None):
-    print(f"accepting from {os.getpid()}")
+    print(f"handled by worker : [ {os.getpid()} ]")
 
     environ = dict()
 
@@ -89,53 +71,3 @@ def koi(application, conn, body, request_method, path_info=None, query_string=No
                 conn.send(data)
         if not headers_sent:
             print("")
-
-if __name__ == "__main__":
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((host, port))
-        s.listen(1)
-
-        print(f"starting koi server on {host}:{port}")
-
-        # workers = 2
-        # for i in range(workers):
-        #     try:
-        #         pid = os.fork()
-        #     except OSError:
-        #         sys.stderr.write("could not create workers")
-
-        #     if pid == 0:
-        #         print(f"Started worker with pid: {os.getpid()}")
-
-        while True:
-            body = []
-            conn, addr = s.accept()
-            http_parser = HttpParser()
-            with conn:
-                while True:
-                    data = conn.recv(1024)
-                    if not data:
-                        break
-                    # conn.sendall(data)
-                    recved = len(data)
-                    nparsed = http_parser.execute(data, recved)
-                    assert nparsed == recved
-
-                    if http_parser.is_headers_complete():
-                        print(http_parser.get_headers())
-
-                    if http_parser.is_partial_body():
-                        body.append(http_parser.recv_body())
-
-                    if http_parser.is_message_complete():
-                        break
-
-                buffered_body = io.StringIO("".join(body))
-                koi(
-                    application,
-                    conn,
-                    body=buffered_body,
-                    request_method=http_parser.get_method(),
-                    content_length=http_parser.get_headers().get('content-length',0)
-                )

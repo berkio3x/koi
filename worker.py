@@ -4,9 +4,12 @@ except ImportError:
     from http_parser.pyparser import HttpParser
 import io
 from koi import koi
-
+import os
 
 def worker(application, socket):
+
+    print(f"Worker booted with pid: {os.getpid()}")
+
     while True:
         body = []
         conn, addr = socket.accept()

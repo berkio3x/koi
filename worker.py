@@ -5,38 +5,50 @@ except ImportError:
 import io
 from koi import koi
 import os
+import signal
+import sys
 
-def worker(application, socket):
+from signals import signal_term_handler
+from functools import partial
 
-    print(f"Worker booted with pid: {os.getpid()}")
+from signal import SIG_DFL
 
-    while True:
-        body = []
-        conn, addr = socket.accept()
-        http_parser = HttpParser()
-        with conn:
-            while True:
-                data = conn.recv(1024)
-                if not data:
-                    break
-                recved = len(data)
-                nparsed = http_parser.execute(data, recved)
-                assert nparsed == recved
 
-                if http_parser.is_headers_complete():
-                    print(http_parser.get_headers())
+class Worker:
+    def __init__(self, application, socket):
+        self.app = application
+        self.socket = socket
 
-                if http_parser.is_partial_body():
-                    body.append(http_parser.recv_body())
+    def start(self):
+        signal.signal(signal.SIGTERM, SIG_DFL)
+        print(f"Worker booted with pid: {os.getpid()}")
+        while True:
+            body = []
+            conn, addr = self.socket.accept()
+            http_parser = HttpParser()
+            with conn:
+                while True:
+                    data = conn.recv(1024)
+                    if not data:
+                        break
+                    recved = len(data)
+                    nparsed = http_parser.execute(data, recved)
+                    assert nparsed == recved
 
-                if http_parser.is_message_complete():
-                    break
+                    if http_parser.is_headers_complete():
+                        print(http_parser.get_headers())
 
-            buffered_body = io.StringIO("".join(body))
-            koi(
-                application,
-                conn,
-                body=buffered_body,
-                request_method=http_parser.get_method(),
-                content_length=http_parser.get_headers().get('content-length',0)
-            )
+                    if http_parser.is_partial_body():
+                        body.append(http_parser.recv_body())
+
+                    if http_parser.is_message_complete():
+                        break
+
+                buffered_body = io.StringIO("".join(body))
+                koi(
+                    self.app,
+                    conn,
+                    body=buffered_body,
+                    request_method=http_parser.get_method(),
+                    content_length=http_parser.get_headers().get('content-length',0)
+                )

@@ -4,9 +4,12 @@ import sys
 
 from utils import make_response
 
-def koi(application, conn, body, request_method, path_info=None, query_string=None,
+def koi(application, conn, request_method, headers=None ,body=None, path_info=None, query_string=None,
          content_type='Application/json', content_length=None):
+
     print(f"handled by worker : [ {os.getpid()} ]")
+
+    print(headers,"...")
 
     environ = dict()
 
@@ -28,6 +31,12 @@ def koi(application, conn, body, request_method, path_info=None, query_string=No
 
     headers_set = []
     headers_sent = []
+
+
+    def check_hop_by_hop_headers(headers):
+        for header_name , header_value in headers:
+            if header_name.lower() in ('transfer encofing' , 'upgrade'):
+                raise ValueError('Applications must not supply a hop by hop header.')
 
     def write(data):
 
@@ -54,20 +63,32 @@ def koi(application, conn, body, request_method, path_info=None, query_string=No
         elif headers_set:
             raise AssertionError("Headers already set.")
 
+        check_hop_by_hop_headers(response_headers)
+
         headers_set[:] = [status, response_headers]
         return write
 
     result = []
 
+    # compress_response = headers.get('Accept-Encoding', None)
+    # if 'gzip' in compress_response:
+    #     # decide if to gzip response or not.
+    #     # Do not compress images or pdf files, as they are already compresses to a good extent.
+    #     # Even if the file is very small , compression can be skipped ?.
+
+    #     if
     try:
         result = application(environ, start_response)
     except Exception as e:
         print(traceback.format_exc())
     else:
-        conn.send(make_response('koi',content_type))
-        conn.send("\r\n".encode('utf8'))
-        for data in result:
-            if data:
-                conn.send(data)
-        if not headers_sent:
-            print("")
+        first_reponse_bytes = next(result)
+        if first_reponse_bytes:
+            conn.send(make_response('koi',content_type))
+            conn.send("\r\n".encode('utf8'))
+            conn.send(first_reponse_bytes)
+            for data in result:
+                if data:
+                    conn.send(data)
+            if not headers_sent:
+                print("")

@@ -48,7 +48,8 @@ class Worker:
                 koi(
                     self.app,
                     conn,
-                    body=buffered_body,
                     request_method=http_parser.get_method(),
+                    headers=http_parser.get_headers(),
+                    body=buffered_body,
                     content_length=http_parser.get_headers().get('content-length',0)
                 )

@@ -6,6 +6,7 @@ from worker import Worker
 from signal import signal, SIGINT, SIGTERM, SIGQUIT, SIGCHLD
 
 from functools import partial
+from optparse import OptionParser
 
 port = 9090
 host = "127.0.0.1"
@@ -13,8 +14,13 @@ host = "127.0.0.1"
 from signals import signal_handler
 
 if __name__ == "__main__":
-    r, w = os.pipe()
 
+    parser = OptionParser()
+    parser.add_option('-w', '--workers', type=int, default=2, help="No of worker processes to handle requests.")
+
+    (options, args) = parser.parse_args()
+
+    r, w = os.pipe()
     s = sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     s.bind((host, port))
@@ -24,7 +30,7 @@ if __name__ == "__main__":
         signal(sig, partial(signal_handler, Worker(application,s)))
 
     print(f"starting koi server on {host}:{port} with master pid({os.getpid()})")
-    workers = 3
+    workers = options.workers
     pid = None
     for i in range(workers):
         try:
